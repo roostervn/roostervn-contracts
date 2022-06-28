@@ -5,6 +5,10 @@ members = ["packages/*", "contracts/*"]
 codegen-units = 1
 incremental = false
 
+[profile.release.package.rvn]
+codegen-units = 1
+incremental = false
+
 [profile.release.package.marketplace]
 codegen-units = 1
 incremental = false
