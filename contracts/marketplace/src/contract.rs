@@ -1,13 +1,20 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    attr, from_binary, to_binary, Api, Binary, CosmosMsg, Deps, DepsMut, Env, 
+    MessageInfo, Response, StdResult, Order, Querier, Storage, WasmMsg,
+};
 use cw2::set_contract_version;
-//use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
-//use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
+use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
+use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
+use std::str::from_utf8;
 
+use crate::package::{ContractInfoResponse, OfferingResponse, QueryOfferingResult};
 use crate::error::ContractError;
 use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{State, STATE};
+
+
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:marketplace";
@@ -66,16 +73,31 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
     Ok(Response::new().add_attribute("method", "reset"))
 }
 
+
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(
+    deps: Deps,
+    _env: Env,
+    msg: QueryMsg
+) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        QueryMsg::GetOfferings {} => to_binary(&query_offerings(deps)?),
     }
 }
 
 fn query_count(deps: Deps) -> StdResult<CountResponse> {
     let state = STATE.load(deps.storage)?;
     Ok(CountResponse { count: state.count })
+}
+
+//================================= Query Handle ====================================================
+
+pub fn query_offerings (
+    deps: Deps,
+) -> StdResult<OfferingsResponse> {
+    let res: StdResult<Vec<QueryOfferingResult>> = OFFERINGS
+        .
 }
 
 #[cfg(test)]
