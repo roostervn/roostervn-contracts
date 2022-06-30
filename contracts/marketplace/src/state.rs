@@ -1,5 +1,6 @@
 use crate::package::ContractInfoResponse;
 use schemars::JsonSchema;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use std::str::from_utf8;
@@ -16,17 +17,19 @@ pub struct State {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Offering {
+pub struct Offering<T> {
+    pub owner: Addr,
     pub token_id: String,
-    pub contract_addr: CanonicalAddr,
-    pub seller: CanonicalAddr,
+    pub contract_addr: Addr,
+    pub seller: Addr,
     pub list_price: Cw20CoinVerified,
+    pub extension: Option<T>,
 }
 
 // STATE 
 pub const STATE: Item<State> = Item::new("state");
 // OFFERINGS is a map which maps the offering_id to an offering. Offering_id is derived from OFFERINGS_COUNT
-pub const OFFERINGS: Map<&str, Offering> = Map::new(from_utf8(b"offerings").unwrap());
+pub const OFFERINGS: Map<&str, Offering<Item<u64>>> = Map::new(from_utf8(b"offerings").unwrap());
 pub const OFFERINGS_COUNT: Item<u64> = Item::new(from_utf8(b"num_offerings").unwrap());
 pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new(from_utf8(b"marketplace_info").unwrap());
 
@@ -42,25 +45,47 @@ pub fn increment_offerings<S: Storage>(storage: &mut S) -> StdResult<u64> {
 }
 
 // Struct of Offerings is Multiindex with T -> Vec<u8>
-pub struct OfferingIndexes<'a, T, S: Storage> {
-    pub seller: MultiIndex<'a, T, S, Offering>,
-    pub contract: MultiIndex<'a, T, S, Offering>,
+pub struct OfferingIndexes<'a, T, S: Storage> 
+where T: Serialize + DeserializeOwned + Clone,
+{
+    pub owner: MultiIndex<'a, Addr, Offering<T>, (Addr, S)>,
+    pub seller: MultiIndex<'a, Addr, Offering<T>, (Addr, S)>,
+    pub contract: MultiIndex<'a, Addr, Offering<T>, (Addr, S)>,
 }
 
 
-impl<'a, T, S: Storage> IndexList<T> for OfferingIndexes<'a, T, S> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<T>> + '_> {
-        let v: Vec<&dyn Index<T>> = vec![&self.seller, &self.contract];
+impl<'a, T, S: Storage> IndexList<Offering<T>> for OfferingIndexes<'a, T, S>
+where
+    T: Serialize + DeserializeOwned + Clone,
+{
+    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<Offering<T>>> + '_> {
+        let v: Vec<&dyn Index<Offering<T>>> = vec![&self.owner, &self.seller, &self.contract];
         Box::new(v.into_iter())
 
     }
 }
 
-pub fn offering<'a, S: Storage>() -> IndexedMap<'a, &'a str, Offering, S> {
-    let indexes = OfferingIndexes {
-        seller: MultiIndex::new(|o| o.seller.to_vec(), "offerings", "offerings_seller"),
+
+pub fn offering_owner_idx<T>(d: &Offering<T>) -> Addr {
+    d.owner.clone()
+}
+
+pub fn offerings<'a, T, S: Storage> () -> IndexedMap<'a, &'a str, Offering<T>, OfferingIndexes<'a, T, S>> 
+where T: Serialize + DeserializeOwned + Clone,
+{
+    let indexes: OfferingIndexes<'a, T, S> = OfferingIndexes {
+        owner: MultiIndex::new(
+            |o| o.owner.clone(),
+            "offerings",
+            "offerings_owner"
+        ),
+        seller: MultiIndex::new(
+            |o| o.seller.clone(),
+            "offerings",
+            "offerings_seller"
+        ),
         contract: MultiIndex::new(
-            |o| o.contract_addr.to_vec(),
+            |o| o.contract_addr.clone(),
             "offerings",
             "offerings_contract",
         ),
