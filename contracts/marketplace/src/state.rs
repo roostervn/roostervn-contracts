@@ -2,8 +2,9 @@ use crate::package::ContractInfoResponse;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use std::str::{from_utf8, FromStr};
 
-use std::str::from_utf8;
 use cosmwasm_std::{Addr, CanonicalAddr, StdResult, Storage};
 use cw20::Cw20CoinVerified;
 use cw_storage_plus::{index_string, Index, IndexList, IndexedMap, Item, Map, MultiIndex};
@@ -23,16 +24,50 @@ pub struct Offering<T> {
     pub contract_addr: Addr,
     pub seller: Addr,
     pub list_price: Cw20CoinVerified,
-    pub extension: Option<T>,
+    pub extension: T
+}
+
+// Trait convert generic type
+pub trait GenericConvert<T> 
+where T: Serialize + DeserializeOwned + Clone,
+{
+    fn set(&mut self, field: &str, value: &T);
+}
+
+// Public fn using to parse Generic type T for String
+impl<T> Offering<T> 
+where T: Serialize + DeserializeOwned + Clone,
+{ 
+    pub fn parse_str_to_T(&mut self, data: &str) -> Result<T, T::Err> where T: FromStr {
+        data.parse::<T>()
+    }
+
+    pub fn parse_T_to_str(&mut self, field: &str, value: &T) {
+        &self.set(field, value);
+        
+    }
+}
+
+// Trait impl GenericConvert for Offering<T>
+impl<T> GenericConvert<T> for Offering<T> 
+where T: Serialize + DeserializeOwned + Clone,
+{
+    fn set(&mut self, field: &str, value: &T)
+    {
+        self.extension = (value as &T).clone()
+    }
 }
 
 // STATE 
 pub const STATE: Item<State> = Item::new("state");
 // OFFERINGS is a map which maps the offering_id to an offering. Offering_id is derived from OFFERINGS_COUNT
-pub const OFFERINGS: Map<&str, Offering<Item<u64>>> = Map::new(from_utf8(b"offerings").unwrap());
-pub const OFFERINGS_COUNT: Item<u64> = Item::new(from_utf8(b"num_offerings").unwrap());
-pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new(from_utf8(b"marketplace_info").unwrap());
+pub const OFFERINGS: Map<&str, Offering<String>> = Map::new("offerings" as &str);
+pub const OFFERINGS_COUNT: Item<u64> = Item::new("num_offerings" as &str);
+pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new("marketplace_info" as &str);
 
+pub fn new_offering<'a, T> () -> Map<'a, &'a str, Offering<T>> {
+    Map::new(from_utf8(b"offerings").unwrap())
+}
 
 pub fn num_offerings<S: Storage>(storage: &S) -> StdResult<u64> {
     Ok(OFFERINGS_COUNT.may_load(storage)?.unwrap_or_default())

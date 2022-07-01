@@ -4,6 +4,9 @@ use cosmwasm_std::{
     attr, from_binary, to_binary, Api, Binary, CosmosMsg, Deps, DepsMut, Env, 
     MessageInfo, Response, StdResult, Order, Querier, Storage, WasmMsg,
 };
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
 use cw2::set_contract_version;
 use cw20::{Cw20ExecuteMsg, Cw20ReceiveMsg};
 use cw721::{Cw721ExecuteMsg, Cw721ReceiveMsg};
@@ -11,8 +14,8 @@ use std::str::from_utf8;
 
 use crate::package::{ContractInfoResponse, OfferingResponse, QueryOfferingResult};
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{State, STATE};
+use crate::msg::{CountResponse, ExecuteMsg, InitMsg, InstantiateMsg, QueryMsg, HandleMsg};
+use crate::state::{State, STATE, CONTRACT_INFO, OFFERINGS, Offering};
 
 
 
@@ -20,37 +23,59 @@ use crate::state::{State, STATE};
 const CONTRACT_NAME: &str = "crates.io:marketplace";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+// Instantiate
+#[entry_point]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msg: InstantiateMsg,
+    msg: InitMsg,
 ) -> Result<Response, ContractError> {
-    let state = State {
-        count: msg.count,
-        owner: info.sender.clone(),
-    };
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    STATE.save(deps.storage, &state)?;
-
-    Ok(Response::new()
-        .add_attribute("method", "instantiate")
-        .add_attribute("owner", info.sender)
-        .add_attribute("count", msg.count.to_string()))
+    let info = ContractInfoResponse { name: msg.name};
+    CONTRACT_INFO.save(deps.storage, &info)?;
+    Ok(Response::default())
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+// Declare a custom Error variant for the ones where you will want to use of of it
+#[entry_point]
 pub fn execute(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msg: ExecuteMsg,
+    msg: HandleMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Increment {} => try_increment(deps),
-        ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        HandleMsg::WithdrawNft { offering_id } => try_withdraw(deps, info, offering_id),
+        HandleMsg::Receive(msg) => try_receive(deps, info, msg),
+        HandleMsg::ReceiveNft(msg) => try_receive_nft(deps, info, msg),
     }
+}
+
+// =================================== Message Handlers ========================================
+
+pub fn try_receive(
+    deps: DepsMut,
+    info: MessageInfo,
+    rcv_msg: Cw20ReceiveMsg,
+) -> Result<Response, ContractError> {
+    Ok(Response::default())
+}
+
+pub fn try_receive_nft(
+    deps: DepsMut,
+    info: MessageInfo,
+    rcv_msg: Cw721ReceiveMsg,
+) -> Result<Response, ContractError> {
+    Ok(Response::default())
+}
+
+pub fn try_withdraw(
+    deps: DepsMut,
+    info: MessageInfo,
+    offering_id: String,
+) -> Result<Response, ContractError> {
+    Ok(Response::default())
 }
 
 pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
@@ -91,15 +116,36 @@ fn query_count(deps: Deps) -> StdResult<CountResponse> {
     Ok(CountResponse { count: state.count })
 }
 
-//================================= Query Handle ====================================================
-
-pub fn query_offerings (
-    deps: Deps,
-) -> StdResult<OfferingsResponse> {
+fn query_offerings(deps: Deps) -> StdResult<OfferingResponse> {
     let res: StdResult<Vec<QueryOfferingResult>> = OFFERINGS
-        .
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|kv_item| parse_offering(kv_item))
+        .collect();
+    Ok(OfferingResponse {
+        offerings: res?, // Placeholder
+    })
 }
 
+fn parse_offering<T>(item: StdResult<(String, Offering<T>)>) -> StdResult<QueryOfferingResult> 
+where T: Serialize + DeserializeOwned + Clone,
+{
+    item.and_then(|(k, offering)| {
+        let extension = serde_json::to_string(&offering.extension).unwrap();
+        Ok(QueryOfferingResult{
+            id: k.to_string(),
+            token_id: offering.token_id,
+            list_price: offering.list_price,
+            contract_addr: offering.contract_addr.clone(),
+            seller: offering.seller.clone(),
+            owner: offering.owner.clone(),
+            extension: extension,
+        })
+    })
+}
+
+//================================= Query Handle ====================================================
+
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -170,3 +216,5 @@ mod tests {
         assert_eq!(5, value.count);
     }
 }
+
+*/
