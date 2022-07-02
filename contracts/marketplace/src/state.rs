@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
 use crate::package::ContractInfoResponse;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
@@ -16,7 +19,13 @@ pub struct State {
     pub count: i32,
     pub owner: Addr,
 }
-
+/**
+ * Offering<T> offer the struct of Offer will list on marketplace
+ * where must have specific owner, seller, contract of Offering 
+ * especially it can expand structure of storage to generics storage
+ * type T where recommend for more functional of Offering like 
+ * discount, special award or linking to other Offering is possible also
+ */
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Offering<T> {
     pub owner: Addr,
@@ -24,58 +33,69 @@ pub struct Offering<T> {
     pub contract_addr: Addr,
     pub seller: Addr,
     pub list_price: Cw20CoinVerified,
-    pub extension: T
+    pub extension: T 
 }
 
-// Trait convert generic type
+/**
+ * Trait define private using in scope of crate state only
+ */
 pub trait GenericConvert<T> 
 where T: Serialize + DeserializeOwned + Clone,
 {
     fn set(&mut self, field: &str, value: &T);
 }
 
-// Public fn using to parse Generic type T for String
+/**
+ * implementation for Offering<T>
+ */
 impl<T> Offering<T> 
 where T: Serialize + DeserializeOwned + Clone,
 { 
-    pub fn parse_str_to_T(&mut self, data: &str) -> Result<T, T::Err> where T: FromStr {
+    // parse string type to T where T is comformtable like string
+    pub fn parse_str_to_t(&mut self, data: &str) -> Result<T, T::Err> where T: FromStr {
         data.parse::<T>()
     }
-
-    pub fn parse_T_to_str(&mut self, field: &str, value: &T) {
-        &self.set(field, value);
+    // parse T to string type using trait implementation of GenerictConvert<T>
+    pub fn parse_t_to_str(&mut self, field: &str, value: &T) {
+        let _ = &self.set(field, value);
         
     }
 }
 
-// Trait impl GenericConvert for Offering<T>
+/**
+ * Trait impl GenericConvert for Offering<T>
+ */
 impl<T> GenericConvert<T> for Offering<T> 
 where T: Serialize + DeserializeOwned + Clone,
 {
+    // set `extension` in Offering<T> to value which reference to T from input
     fn set(&mut self, field: &str, value: &T)
     {
-        self.extension = (value as &T).clone()
+        self.extension = (value as &T).clone();
     }
 }
 
-// STATE 
+// @{Deprecated} STATE  
 pub const STATE: Item<State> = Item::new("state");
 // OFFERINGS is a map which maps the offering_id to an offering. Offering_id is derived from OFFERINGS_COUNT
 pub const OFFERINGS: Map<&str, Offering<String>> = Map::new("offerings" as &str);
 pub const OFFERINGS_COUNT: Item<u64> = Item::new("num_offerings" as &str);
 pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new("marketplace_info" as &str);
 
+// new offering of Offering<T>
 pub fn new_offering<'a, T> () -> Map<'a, &'a str, Offering<T>> {
     Map::new(from_utf8(b"offerings").unwrap())
 }
 
+// amount of Offering in storage where storage ref to contracts deps
 pub fn num_offerings<S: Storage>(storage: &S) -> StdResult<u64> {
     Ok(OFFERINGS_COUNT.may_load(storage)?.unwrap_or_default())
 }
 
+//
 pub fn increment_offerings<S: Storage>(storage: &mut S) -> StdResult<u64> {
     let val = num_offerings(storage)? + 1;
-    OFFERINGS_COUNT.save(storage,&val);
+    let _ = OFFERINGS_COUNT.save(storage,&val);
     Ok(val)
 }
 

@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
 use cosmwasm_std::{Addr, Response};
 use cw20::Cw20CoinVerified;
 use schemars::JsonSchema;

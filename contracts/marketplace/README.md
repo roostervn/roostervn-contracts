@@ -104,3 +104,17 @@ Workspace contains:
 
 Follow [Gitpod Getting Started](https://www.gitpod.io/docs/getting-started) and launch your workspace.
 
+## Checking your code for development
+Append annotation to your top code file to unwarn on development 
+
+```
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+```
+
+Do check code to ensure non warn , err, or synctax problem
+`RUSTFLAGS="$RUSTFLAGS -A unused_imports -A unused_variables" cargo check`
+
+Do build code contract
+`RUSTFLAGS="$RUSTFLAGS -A unused_imports -A unused_variables -C link-arg=-s" cargo wasm`
