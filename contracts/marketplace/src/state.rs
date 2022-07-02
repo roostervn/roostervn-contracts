@@ -8,12 +8,13 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::str::{from_utf8, FromStr};
 
-use cosmwasm_std::{Addr, CanonicalAddr, StdResult, Storage};
+use cosmwasm_std::{Addr, CanonicalAddr, StdResult, Storage, MemoryStorage};
+use cosmwasm_std::testing::MockStorage;
 use cw20::Cw20CoinVerified;
-use cw_storage_plus::{index_string, Index, IndexList, IndexedMap, Item, Map, MultiIndex};
+use cw_storage_plus::{index_string, Index, IndexList, IndexedMap, Item, Map, MultiIndex, KeyDeserialize};
 
 pub static CONFIG_KEYS: &[u8] = b"config";
-
+// @{Deprecated} State sample code
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
     pub count: i32,
@@ -92,24 +93,24 @@ pub fn num_offerings<S: Storage>(storage: &S) -> StdResult<u64> {
     Ok(OFFERINGS_COUNT.may_load(storage)?.unwrap_or_default())
 }
 
-//
+// 
 pub fn increment_offerings<S: Storage>(storage: &mut S) -> StdResult<u64> {
     let val = num_offerings(storage)? + 1;
     let _ = OFFERINGS_COUNT.save(storage,&val);
     Ok(val)
 }
 
-// Struct of Offerings is Multiindex with T -> Vec<u8>
-pub struct OfferingIndexes<'a, T, S: Storage> 
+// Indexes Struct of Offering to ref Addr to Offering<T> by Addr to Storage
+pub struct OfferingIndexes<'a, T> 
 where T: Serialize + DeserializeOwned + Clone,
 {
-    pub owner: MultiIndex<'a, Addr, Offering<T>, (Addr, S)>,
-    pub seller: MultiIndex<'a, Addr, Offering<T>, (Addr, S)>,
-    pub contract: MultiIndex<'a, Addr, Offering<T>, (Addr, S)>,
+    pub owner: MultiIndex<'a, Addr, Offering<T>, Addr>,
+    pub seller: MultiIndex<'a, Addr, Offering<T>, Addr>,
+    pub contract: MultiIndex<'a, Addr, Offering<T>, Addr>,
 }
 
-
-impl<'a, T, S: Storage> IndexList<Offering<T>> for OfferingIndexes<'a, T, S>
+// Interface for building indexes
+impl<'a, T> IndexList<Offering<T>> for OfferingIndexes<'a, T>
 where
     T: Serialize + DeserializeOwned + Clone,
 {
@@ -120,15 +121,16 @@ where
     }
 }
 
-
+// public function used to get Address of specs Offering<T>
 pub fn offering_owner_idx<T>(d: &Offering<T>) -> Addr {
     d.owner.clone()
 }
 
-pub fn offerings<'a, T, S: Storage> () -> IndexedMap<'a, &'a str, Offering<T>, OfferingIndexes<'a, T, S>> 
+// Storage function used to build IndexedMap
+pub fn offerings<'a, T, S: Storage> () -> IndexedMap<'a, &'a str, Offering<T>, OfferingIndexes<'a, T>> 
 where T: Serialize + DeserializeOwned + Clone,
 {
-    let indexes: OfferingIndexes<'a, T, S> = OfferingIndexes {
+    let indexes: OfferingIndexes<'a, T> = OfferingIndexes {
         owner: MultiIndex::new(
             |o| o.owner.clone(),
             "offerings",
@@ -146,4 +148,55 @@ where T: Serialize + DeserializeOwned + Clone,
         ),
     };
     IndexedMap::new("offerings", indexes)
+}
+
+#[cfg(test)]
+mod test_state {
+    use super::*;
+    use cosmwasm_std::testing::{
+        mock_dependencies,
+        mock_dependencies_with_balance,
+        mock_env, mock_info,
+        MockStorage,
+        MOCK_CONTRACT_ADDR,
+    };
+    use cosmwasm_std::{coins, from_binary, Uint128, Order};
+    use std::borrow::BorrowMut;
+    #[test]
+    fn test_offerings() {
+        // define test case env
+        let mut store = MockStorage::new();
+        let owner1 = Addr::unchecked("addr1");
+        let contract1 = Addr::unchecked("contract1");
+        let extension1 = String::from("testing_addr1");
+        // define Offering by test case
+        let offering_addr1 = Offering::<String> {
+            owner: owner1.clone(),
+            token_id: String::from("NFT1"),
+            seller: owner1.clone(),
+            contract_addr: contract1.clone(),
+            list_price: Cw20CoinVerified {
+                address: owner1.clone(),
+                amount: Uint128::from(1000000u128),
+            },
+            extension: extension1,
+        };
+        // test for storage init and save
+        let token_id = increment_offerings(store.borrow_mut()).unwrap();
+        offerings::<String, MockStorage >().save(store.borrow_mut(), &u64::from(token_id).to_string(), &offering_addr1).unwrap();
+
+        // want to load Offering<T> using owner1 and contract1
+        let list: Vec<_> = offerings::<String, MemoryStorage>()
+            .idx.owner
+            .prefix(owner1)
+            .range(&store, None, None, Order::Ascending)
+            .collect::<StdResult<_>>().unwrap();
+            
+
+            //.prefix_range(&store, None, None, Order::Ascending)
+            //.collect::<StdResult<_>>().unwrap();
+        
+
+
+    }
 }
