@@ -18,7 +18,7 @@ use std::str::from_utf8;
 use crate::package::{ContractInfoResponse, OfferingResponse, QueryOfferingResult};
 use crate::error::ContractError;
 use crate::msg::{CountResponse, ExecuteMsg, InitMsg, InstantiateMsg, QueryMsg, HandleMsg, SellNft, BuyNft};
-use crate::state::{State, STATE, CONTRACT_INFO, OFFERINGS, Offering};
+use crate::state::{State, STATE, CONTRACT_INFO, OFFERINGS, Offering, increment_offerings};
 
 
 
@@ -125,7 +125,36 @@ pub fn try_receive_nft(
     info: MessageInfo,
     rcv_msg: Cw721ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    Ok(Response::default())
+    let msg: SellNft = from_binary(&rcv_msg.msg)?;
+
+    // check same token_id from same original contract is already on sale
+    // get OFFERING_COUNT
+    let id = increment_offerings(deps.storage)?.to_string();
+
+    // save Offering
+    let token_id = rcv_msg.token_id.to_string();
+    let off = Offering::<String> {
+        owner: deps.api.addr_validate(&rcv_msg.sender)?,
+        contract_addr: info.sender.clone(),
+        token_id: rcv_msg.token_id,
+        seller: deps.api.addr_validate(&rcv_msg.sender)?,
+        list_price: msg.list_price.clone(),
+        extension: format!("Offer {} from {}", token_id, deps.api.addr_validate(&rcv_msg.sender)?),
+    };
+
+
+    OFFERINGS.save(deps.storage, &id, &off)?;
+
+    let price_string = format!("{} {}", msg.list_price.amount, msg.list_price.address);
+
+    Ok(Response::new()
+        .add_attribute("action", "sell_nft")
+        .add_attribute("original_contract", info.sender)
+        .add_attribute("owner", off.owner)
+        .add_attribute("seller", off.seller)
+        .add_attribute("list_price", price_string)
+        .add_attribute("token_id", off.token_id)
+    )
 }
 
 pub fn try_withdraw(

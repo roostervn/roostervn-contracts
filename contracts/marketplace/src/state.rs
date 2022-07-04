@@ -9,7 +9,7 @@ use std::fmt::Display;
 use std::str::{from_utf8, FromStr};
 
 use cosmwasm_std::{Addr, CanonicalAddr, StdResult, Storage, MemoryStorage};
-use cosmwasm_std::testing::MockStorage;
+//use cosmwasm_std::testing::MockStorage;
 use cw20::Cw20CoinVerified;
 use cw_storage_plus::{index_string, Index, IndexList, IndexedMap, Item, Map, MultiIndex, KeyDeserialize};
 
@@ -89,12 +89,12 @@ pub fn new_offering<'a, T> () -> Map<'a, &'a str, Offering<T>> {
 }
 
 // amount of Offering in storage where storage ref to contracts deps
-pub fn num_offerings<S: Storage>(storage: &S) -> StdResult<u64> {
+pub fn num_offerings(storage: &dyn Storage) -> StdResult<u64> {
     Ok(OFFERINGS_COUNT.may_load(storage)?.unwrap_or_default())
 }
 
 // 
-pub fn increment_offerings<S: Storage>(storage: &mut S) -> StdResult<u64> {
+pub fn increment_offerings(storage: &mut dyn Storage) -> StdResult<u64> {
     let val = num_offerings(storage)? + 1;
     let _ = OFFERINGS_COUNT.save(storage,&val);
     Ok(val)
@@ -162,7 +162,9 @@ mod test_state {
     };
     use cosmwasm_std::{coins, from_binary, Uint128, Order};
     use std::borrow::BorrowMut;
+    
     #[test]
+    #[cfg(not(target_arch = "wasm32"))]
     fn test_offerings() {
         // define test case env
         let mut store = MockStorage::new();
