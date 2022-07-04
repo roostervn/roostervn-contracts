@@ -5,7 +5,7 @@
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
     attr, from_binary, to_binary, Api, Binary, CosmosMsg, Deps, DepsMut, Env, 
-    MessageInfo, Response, StdResult, Order, Querier, Storage, WasmMsg,
+    MessageInfo, Response, StdResult, Order, Querier, Storage, WasmMsg, SubMsg,
 };
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use std::str::from_utf8;
 
 use crate::package::{ContractInfoResponse, OfferingResponse, QueryOfferingResult};
 use crate::error::ContractError;
-use crate::msg::{CountResponse, ExecuteMsg, InitMsg, InstantiateMsg, QueryMsg, HandleMsg};
+use crate::msg::{CountResponse, ExecuteMsg, InitMsg, InstantiateMsg, QueryMsg, HandleMsg, SellNft, BuyNft};
 use crate::state::{State, STATE, CONTRACT_INFO, OFFERINGS, Offering};
 
 
@@ -26,7 +26,7 @@ use crate::state::{State, STATE, CONTRACT_INFO, OFFERINGS, Offering};
 const CONTRACT_NAME: &str = "crates.io:marketplace";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// Instantiate
+// Instantiate 
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
@@ -62,7 +62,62 @@ pub fn try_receive(
     info: MessageInfo,
     rcv_msg: Cw20ReceiveMsg,
 ) -> Result<Response, ContractError> {
-    Ok(Response::default())
+    let msg: BuyNft = from_binary(&rcv_msg.msg)?;
+
+    // check if offering exists
+    let off = OFFERINGS.load(deps.storage, &msg.offering_id)?;
+
+    // chek for enough coins
+    if rcv_msg.amount < off.list_price.amount {
+        return Err(ContractError::InsufficientFunds {});
+    }
+
+    // create transfer cw20 msg
+    let transfer_cw20_msg = Cw20ExecuteMsg::Transfer {
+        recipient: off.seller.clone().into_string(),
+        amount: rcv_msg.amount,
+    };
+    let exec_cw20_transfer = WasmMsg::Execute {
+        contract_addr: info.sender.clone().into_string(),
+        msg: to_binary(&transfer_cw20_msg)?,
+        funds: vec![],
+    };
+    
+    // create transfer cw721 msg
+    let transfer_cw721_msg = Cw721ExecuteMsg::TransferNft {
+        recipient: rcv_msg.sender.clone(),
+        token_id: off.token_id.clone(),
+    };
+    let exec_cw721_transfer = WasmMsg::Execute {
+        contract_addr: off.contract_addr.clone().into_string(),
+        msg: to_binary(&transfer_cw721_msg)?,
+        funds: vec![],
+    };
+
+    // if everything is fine transfer cw20 to seller
+    let cw20_transfer_cosmos_msg: CosmosMsg = exec_cw20_transfer.into();
+    // transfer nft to owner
+    let cw721_transfer_cosmos_msg: CosmosMsg = exec_cw721_transfer.into();
+
+    let cw20_submsg = SubMsg::new(cw20_transfer_cosmos_msg);
+    let cw721_submsg = SubMsg::new(cw721_transfer_cosmos_msg);
+
+    let cosmos_msgs = vec![cw20_submsg, cw721_submsg];
+
+    // delete offering
+    OFFERINGS.remove(deps.storage, &msg.offering_id);
+
+    let price_string = format!("{} {}", rcv_msg.amount, info.sender);
+
+    Ok(Response::new()
+        .add_attribute("action", "buy_nft")
+        .add_attribute("buyer", rcv_msg.sender)
+        .add_attribute("seller", off.seller)
+        .add_attribute("paid_price", price_string)
+        .add_attribute("token_id", off.token_id)
+        .add_attribute("contract_addr", off.contract_addr)
+        .add_submessages(cosmos_msgs)
+    )
 }
 
 pub fn try_receive_nft(
@@ -101,7 +156,6 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
     Ok(Response::new().add_attribute("method", "reset"))
 }
 
-
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(
     deps: Deps,
@@ -113,6 +167,8 @@ pub fn query(
         QueryMsg::GetOfferings {} => to_binary(&query_offerings(deps)?),
     }
 }
+
+// ================================ Query Handlers ==================================================
 
 fn query_count(deps: Deps) -> StdResult<CountResponse> {
     let state = STATE.load(deps.storage)?;
@@ -147,15 +203,14 @@ where T: Serialize + DeserializeOwned + Clone,
 }
 
 //================================= Query Handle ====================================================
-
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies,mock_dependencies_with_balance, mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary};
 
-    #[test]
+    //#[test]
+    /*
     fn proper_initialization() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
@@ -171,8 +226,9 @@ mod tests {
         let value: CountResponse = from_binary(&res).unwrap();
         assert_eq!(17, value.count);
     }
-
-    #[test]
+    */
+    // #[test]
+    /*
     fn increment() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
@@ -190,8 +246,9 @@ mod tests {
         let value: CountResponse = from_binary(&res).unwrap();
         assert_eq!(18, value.count);
     }
-
-    #[test]
+    */
+    // #[test]
+    /*
     fn reset() {
         let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
@@ -218,6 +275,5 @@ mod tests {
         let value: CountResponse = from_binary(&res).unwrap();
         assert_eq!(5, value.count);
     }
+    */
 }
-
-*/

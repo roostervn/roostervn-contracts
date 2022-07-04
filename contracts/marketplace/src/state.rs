@@ -191,10 +191,8 @@ mod test_state {
             .prefix(owner1)
             .range(&store, None, None, Order::Ascending)
             .collect::<StdResult<_>>().unwrap();
-            
-
-            //.prefix_range(&store, None, None, Order::Ascending)
-            //.collect::<StdResult<_>>().unwrap();
+        let (_, t) = &list[0];
+        assert_eq!(t, &offering_addr1);
         
 
 
