@@ -26,6 +26,9 @@ use crate::state::{State, STATE, CONTRACT_INFO, OFFERINGS, Offering, increment_o
 const CONTRACT_NAME: &str = "crates.io:marketplace";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 // Instantiate 
 #[entry_point]
 pub fn instantiate(
@@ -40,6 +43,9 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 // Declare a custom Error variant for the ones where you will want to use of of it
 #[entry_point]
 pub fn execute(
@@ -57,6 +63,9 @@ pub fn execute(
 
 // =================================== Message Handlers ========================================
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 pub fn try_receive(
     deps: DepsMut,
     info: MessageInfo,
@@ -120,6 +129,9 @@ pub fn try_receive(
     )
 }
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 pub fn try_receive_nft(
     deps: DepsMut,
     info: MessageInfo,
@@ -157,14 +169,47 @@ pub fn try_receive_nft(
     )
 }
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 pub fn try_withdraw(
     deps: DepsMut,
     info: MessageInfo,
     offering_id: String,
 ) -> Result<Response, ContractError> {
-    Ok(Response::default())
-}
+    // check if token_id is currency sold by the requesting address
+    let off = OFFERINGS.load(deps.storage, &offering_id)?;
+    if off.seller == info.sender.clone() {
+        // transfer token back to original owner
+        let transfer_cw721_msg = Cw721ExecuteMsg::TransferNft {
+            recipient: off.seller.clone().to_string(),
+            token_id: off.token_id.clone(),
+        };
 
+        let exec_cw721_transfer = WasmMsg::Execute {
+            contract_addr: off.contract_addr.clone().into_string(),
+            msg: to_binary(&transfer_cw721_msg)?,
+            funds: vec![],
+        };
+
+        let cw721_transfer_cosmos_msg: CosmosMsg = exec_cw721_transfer.into();
+        let cw721_submsg = SubMsg::new(cw721_transfer_cosmos_msg);
+
+        OFFERINGS.remove(deps.storage, &offering_id);
+
+        return Ok(Response::new()
+            .add_attribute("action", "withdraw_nft")
+            .add_attribute("seller", info.sender)
+            .add_attribute("offering_id", offering_id)
+            .add_submessage(cw721_submsg)
+        );
+    }
+    Err(ContractError::Unauthorized {})
+}
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * {Deprecated}
+ */
 pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
         state.count += 1;
@@ -173,7 +218,10 @@ pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
 
     Ok(Response::new().add_attribute("method", "try_increment"))
 }
-
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * {Deprecated}
+ */
 pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
     STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
         if info.sender != state.owner {
@@ -185,6 +233,9 @@ pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Respons
     Ok(Response::new().add_attribute("method", "reset"))
 }
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(
     deps: Deps,
@@ -198,12 +249,17 @@ pub fn query(
 }
 
 // ================================ Query Handlers ==================================================
-
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 fn query_count(deps: Deps) -> StdResult<CountResponse> {
     let state = STATE.load(deps.storage)?;
     Ok(CountResponse { count: state.count })
 }
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 fn query_offerings(deps: Deps) -> StdResult<OfferingResponse> {
     let res: StdResult<Vec<QueryOfferingResult>> = OFFERINGS
         .range(deps.storage, None, None, Order::Ascending)
@@ -214,6 +270,9 @@ fn query_offerings(deps: Deps) -> StdResult<OfferingResponse> {
     })
 }
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 fn parse_offering<T>(item: StdResult<(String, Offering<T>)>) -> StdResult<QueryOfferingResult> 
 where T: Serialize + DeserializeOwned + Clone,
 {
@@ -232,77 +291,122 @@ where T: Serialize + DeserializeOwned + Clone,
 }
 
 //================================= Query Handle ====================================================
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * Test contracts
+ */
 #[cfg(test)]
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_dependencies,mock_dependencies_with_balance, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary};
+    use cosmwasm_std::{Deps, DepsMut, Addr, coins, from_binary, Uint128};
+    use cw20::Cw20CoinVerified;
+    use cw721::Cw721ReceiveMsg;
 
-    //#[test]
-    /*
-    fn proper_initialization() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
+    #[test]
+    fn sell_offering_path() {
+        let mut deps = mock_dependencies();
 
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(1000, "earth"));
+        let msg = InitMsg { count: 17, name: "test marketplace".to_string() };
+        let info = mock_info("creator", &coins(1000, "token"));
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(17, value.count);
-    }
-    */
-    // #[test]
-    /*
-    fn increment() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
-
-        let msg = InstantiateMsg { count: 17 };
-        let info = mock_info("creator", &coins(2, "token"));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, _res.messages.len());
 
-        // beneficiary can release it
+        // seller can release nft
         let info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Increment {};
-        let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // should increase counter by 1
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(18, value.count);
+        let sell_msg = SellNft {
+            list_price: Cw20CoinVerified {
+                address: Addr::unchecked("cw20ContractAddr"),
+                amount: Uint128::new(5),
+            },
+        };
+
+        let rcv_msg = HandleMsg::ReceiveNft(
+            Cw721ReceiveMsg {
+                sender: String::from("seller"),
+                token_id: String::from("SellableNFT"),
+                msg: to_binary(&sell_msg).unwrap(),
+            },
+        );
+        
+        let _res = execute(deps.as_mut(), mock_env(), info, rcv_msg).unwrap();
+
+        // Offering should be listed
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetOfferings {}).unwrap();
+        let value: OfferingResponse = from_binary(&res).unwrap();
+        assert_eq!(1, value.offerings.len());
+
+        let buy_msg = BuyNft {
+            offering_id: value.offerings[0].id.clone(),
+        };
+
+        let rcv_msg = HandleMsg::Receive(
+            Cw20ReceiveMsg {
+                sender: String::from("buyer"),
+                amount: Uint128::new(5),
+                msg: to_binary(&buy_msg).unwrap()
+            }
+        );
+
+        let info_buy = mock_info("cw20ContractAddr", &coins(2, "token"));
+
+        let _res = execute(deps.as_mut(), mock_env(), info_buy, rcv_msg).unwrap();
+
+        // check Offerings again. Should be 0
+        let buy_res = query(deps.as_ref(), mock_env(), QueryMsg::GetOfferings {}).unwrap();
+        let buy_value: OfferingResponse = from_binary(&buy_res).unwrap();
+        assert_eq!(0, buy_value.offerings.len());
     }
-    */
-    // #[test]
-    /*
-    fn reset() {
-        let mut deps = mock_dependencies_with_balance(&coins(2, "token"));
 
-        let msg = InstantiateMsg { count: 17 };
+    #[test]
+    fn withdraw_offering_path() {
+        let mut deps = mock_dependencies();
+
+        let msg = InitMsg {
+            name: String::from("test market"),
+            count: 1000,
+        };
         let info = mock_info("creator", &coins(2, "token"));
         let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
 
-        // beneficiary can release it
-        let unauth_info = mock_info("anyone", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let res = execute(deps.as_mut(), mock_env(), unauth_info, msg);
-        match res {
-            Err(ContractError::Unauthorized {}) => {}
-            _ => panic!("Must return unauthorized error"),
-        }
+        // Release Offering NFT to Sell
+        let info = mock_info("anyone", &coins(2, "token"));
 
-        // only the original creator can reset the counter
-        let auth_info = mock_info("creator", &coins(2, "token"));
-        let msg = ExecuteMsg::Reset { count: 5 };
-        let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
+        let sell_msg = SellNft {
+            list_price: Cw20CoinVerified {
+                address: Addr::unchecked("cw20ContractAddr"),
+                amount: Uint128::new(5),
+            },
+        };
 
-        // should now be 5
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(5, value.count);
+        let rcv_msg = HandleMsg::ReceiveNft(
+            Cw721ReceiveMsg {
+                sender: String::from("seller"),
+                token_id: String::from("SellableNFT"),
+                msg: to_binary(&sell_msg).unwrap(),
+            },
+        );
+
+        let _res = execute(deps.as_mut(), mock_env(), info, rcv_msg).unwrap();
+
+        // Offerings should be listed
+        let list_res = query(deps.as_ref(), mock_env(), QueryMsg::GetOfferings {}).unwrap();
+        let list_value: OfferingResponse = from_binary(&list_res).unwrap();
+        assert_eq!(1, list_value.offerings.len());
+        //assert_eq!("1", list_value.offerings[0].id.clone());
+        // Withraw offering
+        let withraw_info = mock_info("seller", &coins(2, "token"));
+        let withraw_msg = HandleMsg::WithdrawNft {
+            offering_id: list_value.offerings[0].id.clone(),
+        };
+        let _res = execute(deps.as_mut(), mock_env(), withraw_info, withraw_msg).unwrap();
+        assert_eq!("1", _res.attributes[2].value);
+        // Offering should be removed
+        let rm_res = query(deps.as_ref(), mock_env(), QueryMsg::GetOfferings {}).unwrap();
+        let rm_value: OfferingResponse = from_binary(&rm_res).unwrap();
+        assert_eq!(0, rm_value.offerings.len());
     }
-    */
 }

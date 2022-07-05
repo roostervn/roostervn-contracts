@@ -20,7 +20,9 @@ pub struct State {
     pub count: i32,
     pub owner: Addr,
 }
+
 /**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
  * Offering<T> offer the struct of Offer will list on marketplace
  * where must have specific owner, seller, contract of Offering 
  * especially it can expand structure of storage to generics storage
@@ -38,6 +40,7 @@ pub struct Offering<T> {
 }
 
 /**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
  * Trait define private using in scope of crate state only
  */
 pub trait GenericConvert<T> 
@@ -47,6 +50,7 @@ where T: Serialize + DeserializeOwned + Clone,
 }
 
 /**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
  * implementation for Offering<T>
  */
 impl<T> Offering<T> 
@@ -64,6 +68,7 @@ where T: Serialize + DeserializeOwned + Clone,
 }
 
 /**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
  * Trait impl GenericConvert for Offering<T>
  */
 impl<T> GenericConvert<T> for Offering<T> 
@@ -83,24 +88,35 @@ pub const OFFERINGS: Map<&str, Offering<String>> = Map::new("offerings" as &str)
 pub const OFFERINGS_COUNT: Item<u64> = Item::new("num_offerings" as &str);
 pub const CONTRACT_INFO: Item<ContractInfoResponse> = Item::new("marketplace_info" as &str);
 
-// new offering of Offering<T>
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * new offering of Offering<T>
+ */
 pub fn new_offering<'a, T> () -> Map<'a, &'a str, Offering<T>> {
     Map::new(from_utf8(b"offerings").unwrap())
 }
 
-// amount of Offering in storage where storage ref to contracts deps
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * amount of Offering in storage where storage ref to contracts deps
+ */
 pub fn num_offerings(storage: &dyn Storage) -> StdResult<u64> {
     Ok(OFFERINGS_COUNT.may_load(storage)?.unwrap_or_default())
 }
 
-// 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ */
 pub fn increment_offerings(storage: &mut dyn Storage) -> StdResult<u64> {
     let val = num_offerings(storage)? + 1;
     let _ = OFFERINGS_COUNT.save(storage,&val);
     Ok(val)
 }
 
-// Indexes Struct of Offering to ref Addr to Offering<T> by Addr to Storage
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * Indexes Struct of Offering to ref Addr to Offering<T> by Addr to Storage
+ */
 pub struct OfferingIndexes<'a, T> 
 where T: Serialize + DeserializeOwned + Clone,
 {
@@ -109,7 +125,11 @@ where T: Serialize + DeserializeOwned + Clone,
     pub contract: MultiIndex<'a, Addr, Offering<T>, Addr>,
 }
 
-// Interface for building indexes
+
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * Interface for building indexes
+ */
 impl<'a, T> IndexList<Offering<T>> for OfferingIndexes<'a, T>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -121,12 +141,18 @@ where
     }
 }
 
-// public function used to get Address of specs Offering<T>
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com> 
+ * public function used to get Address of specs Offering<T>
+ */
 pub fn offering_owner_idx<T>(d: &Offering<T>) -> Addr {
     d.owner.clone()
 }
 
-// Storage function used to build IndexedMap
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * Storage function used to build IndexedMap
+ */
 pub fn offerings<'a, T, S: Storage> () -> IndexedMap<'a, &'a str, Offering<T>, OfferingIndexes<'a, T>> 
 where T: Serialize + DeserializeOwned + Clone,
 {
@@ -150,6 +176,10 @@ where T: Serialize + DeserializeOwned + Clone,
     IndexedMap::new("offerings", indexes)
 }
 
+/**
+ * @author kevinnguyen <kevin.nguyen.ai@gmail.com>
+ * test storage 
+ */
 #[cfg(test)]
 mod test_state {
     use super::*;
