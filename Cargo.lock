@@ -163,8 +163,8 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cw-multi-test",
- "cw-storage-plus",
- "cw2",
+ "cw-storage-plus 0.13.4",
+ "cw2 0.13.4",
  "cw721 0.13.2",
  "schemars",
  "serde",
@@ -193,7 +193,7 @@ dependencies = [
  "anyhow",
  "cosmwasm-std",
  "cosmwasm-storage",
- "cw-storage-plus",
+ "cw-storage-plus 0.13.4",
  "cw-utils 0.13.4",
  "derivative",
  "itertools",
@@ -201,6 +201,17 @@ dependencies = [
  "schemars",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "cw-storage-plus"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d7ee1963302b0ac2a9d42fe0faec826209c17452bfd36fbfd9d002a88929261"
+dependencies = [
+ "cosmwasm-std",
+ "schemars",
+ "serde",
 ]
 
 [[package]]
@@ -240,12 +251,24 @@ dependencies = [
 
 [[package]]
 name = "cw2"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1d81d7c359d6c1fba3aa83dad7ec6f999e512571380ae62f81257c3db569743"
+dependencies = [
+ "cosmwasm-std",
+ "cw-storage-plus 0.11.1",
+ "schemars",
+ "serde",
+]
+
+[[package]]
+name = "cw2"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04cf4639517490dd36b333bbd6c4fbd92e325fd0acf4683b41753bc5eb63bfc1"
 dependencies = [
  "cosmwasm-std",
- "cw-storage-plus",
+ "cw-storage-plus 0.13.4",
  "schemars",
  "serde",
 ]
@@ -283,6 +306,21 @@ dependencies = [
  "cw-utils 0.13.4",
  "schemars",
  "serde",
+]
+
+[[package]]
+name = "cw721-base"
+version = "0.11.0"
+dependencies = [
+ "cosmwasm-schema",
+ "cosmwasm-std",
+ "cw-storage-plus 0.11.1",
+ "cw-utils 0.11.1",
+ "cw2 0.11.1",
+ "cw721 0.11.0",
+ "schemars",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -488,9 +526,9 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cw-multi-test",
- "cw-storage-plus",
+ "cw-storage-plus 0.13.4",
  "cw-utils 0.13.4",
- "cw2",
+ "cw2 0.13.4",
  "cw20",
  "cw721 0.13.2",
  "schemars",
@@ -594,8 +632,8 @@ dependencies = [
  "cosmwasm-std",
  "cosmwasm-storage",
  "cw-multi-test",
- "cw-storage-plus",
- "cw2",
+ "cw-storage-plus 0.13.4",
+ "cw2 0.13.4",
  "schemars",
  "serde",
  "thiserror",

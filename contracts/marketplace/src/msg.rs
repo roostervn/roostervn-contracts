@@ -24,6 +24,8 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
+    Increment {},
+    Reset {},
     WithdrawNft { offering_id: String },
     Receive(Cw20ReceiveMsg),
     ReceiveNft(Cw721ReceiveMsg),

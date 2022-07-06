@@ -55,6 +55,8 @@ pub fn execute(
     msg: HandleMsg,
 ) -> Result<Response, ContractError> {
     match msg {
+        HandleMsg::Increment {} => Ok(Response::new().add_attribute("status", "OK").add_attribute("messages", String::from("Increment Called"))),
+        HandleMsg::Reset {} => Ok(Response::new().add_attribute("status", "OK").add_attribute("messages", String::from("Reset Called"))),
         HandleMsg::WithdrawNft { offering_id } => try_withdraw(deps, info, offering_id),
         HandleMsg::Receive(msg) => try_receive(deps, info, msg),
         HandleMsg::ReceiveNft(msg) => try_receive_nft(deps, info, msg),
