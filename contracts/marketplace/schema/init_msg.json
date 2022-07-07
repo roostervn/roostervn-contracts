@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InitMsg",
+  "description": "@owner KevinNguyen <kevinnguyen.asian.vie@gmail.com> @date Create in 2022-29-06 12:59:00",
+  "type": "object",
+  "required": [
+    "count",
+    "name"
+  ],
+  "properties": {
+    "count": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "name": {
+      "type": "string"
+    }
+  }
+}
