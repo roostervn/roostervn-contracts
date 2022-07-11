@@ -6,7 +6,7 @@ command -v shellcheck > /dev/null && shellcheck "$0"
 ALL_PACKAGES="cw721"
 
 # these are imported by other contracts
-BASE_CONTRACTS="cw721-base"
+BASE_CONTRACTS="rvn-base"
 ALL_CONTRACTS="cw721-metadata-onchain"
 
 SLEEP_TIME=30
