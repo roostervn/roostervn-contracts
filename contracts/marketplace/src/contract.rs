@@ -89,7 +89,7 @@ pub fn try_receive(
         amount: rcv_msg.amount,
     };
     let exec_cw20_transfer = WasmMsg::Execute {
-        contract_addr: info.sender.clone().into_string(),
+        contract_addr: off.list_price.address.clone().to_string(),
         msg: to_binary(&transfer_cw20_msg)?,
         funds: vec![],
     };
