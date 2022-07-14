@@ -83,8 +83,9 @@ pub fn try_receive(
         return Err(ContractError::InsufficientFunds {});
     }
 
-    // create transfer cw20 msg
-    let transfer_cw20_msg = Cw20ExecuteMsg::Transfer {
+    // create transfer cw20 msg to send to recipient
+    let transfer_cw20_msg = Cw20ExecuteMsg::TransferFrom {
+        owner: info.sender.clone().into_string(),
         recipient: off.seller.clone().into_string(),
         amount: rcv_msg.amount,
     };
